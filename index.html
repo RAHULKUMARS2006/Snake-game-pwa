@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#000000"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+<title>SNAKE</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{--g:#00ff41;--dg:#007a1f;--bg:#000;--dim:#003d10;}
+body{background:var(--bg);color:var(--g);font-family:'VT323',monospace;height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(0,255,65,.03) 0px,rgba(0,255,65,.03) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:999;}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.7) 100%);pointer-events:none;z-index:998;}
+
+.screen{display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;position:absolute;inset:0;padding:16px;}
+.screen.active{display:flex;}
+
+#home{gap:20px;}
+.title-box{text-align:center;}
+.title{font-family:'Press Start 2P',monospace;font-size:clamp(28px,8vw,56px);color:var(--g);text-shadow:0 0 10px var(--g),0 0 30px var(--g);animation:pulse 2s infinite;}
+.subtitle{font-size:clamp(14px,4vw,22px);color:var(--dg);margin-top:8px;letter-spacing:4px;}
+.best-box{border:2px solid var(--dg);padding:10px 28px;font-size:clamp(16px,4vw,26px);color:var(--dg);}
+.best-box span{color:var(--g);}
+.btn{font-family:'Press Start 2P',monospace;font-size:clamp(10px,3vw,16px);padding:14px 32px;background:transparent;border:2px solid var(--g);color:var(--g);cursor:pointer;text-shadow:0 0 8px var(--g);box-shadow:0 0 12px var(--g),inset 0 0 12px rgba(0,255,65,.1);transition:.2s;letter-spacing:2px;}
+.btn:hover,.btn:active{background:var(--g);color:#000;box-shadow:0 0 24px var(--g);}
+.blink{animation:blink 1.2s step-end infinite;}
+
+#game{padding:0;gap:0;}
+#hud{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--dg);font-size:clamp(14px,4vw,22px);flex-shrink:0;}
+#canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;}
+#gc{display:block;image-rendering:pixelated;}
+#dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:4px;padding:12px;flex-shrink:0;}
+.dp{background:rgba(0,255,65,.08);border:1.5px solid var(--dg);color:var(--g);font-size:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;user-select:none;transition:.1s;touch-action:none;}
+.dp:active,.dp.pressed{background:rgba(0,255,65,.25);box-shadow:0 0 8px var(--g);}
+.dp.blank{background:transparent;border-color:transparent;pointer-events:none;}
+
+#gameover{gap:18px;text-align:center;}
+.go-title{font-family:'Press Start 2P',monospace;font-size:clamp(18px,6vw,38px);color:#ff0040;text-shadow:0 0 12px #ff0040;animation:flicker .15s infinite alternate;}
+.score-panel{border:2px solid var(--dg);padding:16px 32px;display:flex;flex-direction:column;gap:10px;}
+.score-row{font-size:clamp(16px,4vw,26px);display:flex;justify-content:space-between;gap:24px;}
+.score-row span:last-child{color:var(--g);}
+.btn-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+
+@keyframes pulse{0%,100%{text-shadow:0 0 10px var(--g),0 0 30px var(--g);}50%{text-shadow:0 0 20px var(--g),0 0 60px var(--g),0 0 80px var(--g);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+@keyframes flicker{from{opacity:1;}to{opacity:.8;}}
+</style>
+</head>
+<body>
+
+<div class="screen active" id="home">
+  <div class="title-box">
+    <div class="title">SNAKE</div>
+    <div class="subtitle">TERMINAL v1.0</div>
+  </div>
+  <div class="best-box">BEST: <span id="home-best">0</span></div>
+  <button class="btn" id="play-btn">▶ PLAY</button>
+  <div style="font-size:13px;color:var(--dg);margin-top:4px;" class="blink">[ USE ARROWS / WASD / SWIPE ]</div>
+</div>
+
+<div class="screen" id="game">
+  <div id="hud">
+    <span>SCORE: <span id="score-val">0</span></span>
+    <span>BEST: <span id="hud-best">0</span></span>
+  </div>
+  <div id="canvas-wrap"><canvas id="gc"></canvas></div>
+  <div id="dpad">
+    <div class="dp blank"></div>
+    <div class="dp" id="dp-up">▲</div>
+    <div class="dp blank"></div>
+    <div class="dp" id="dp-left">◀</div>
+    <div class="dp blank" style="background:rgba(0,255,65,.04);border:1.5px solid var(--dim);border-radius:6px;"></div>
+    <div class="dp" id="dp-right">▶</div>
+    <div class="dp blank"></div>
+    <div class="dp" id="dp-down">▼</div>
+    <div class="dp blank"></div>
+  </div>
+</div>
+
+<div class="screen" id="gameover">
+  <div class="go-title">GAME OVER</div>
+  <div class="score-panel">
+    <div class="score-row"><span>SCORE</span><span id="go-score">0</span></div>
+    <div class="score-row"><span>BEST</span><span id="go-best">0</span></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="retry-btn">↺ RETRY</button>
+    <button class="btn" id="home-btn">⌂ HOME</button>
+  </div>
+</div>
+
+<script>
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+function beep(freq,type,dur,vol=.3){try{const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);o.type=type;o.frequency.setValueAtTime(freq,AC.currentTime);g.gain.setValueAtTime(vol,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+dur);o.start();o.stop(AC.currentTime+dur);}catch(e){}}
+function sndEat(){beep(440,'square',.08);setTimeout(()=>beep(660,'square',.08),60);}
+function sndDie(){beep(200,'sawtooth',.1,.4);setTimeout(()=>beep(150,'sawtooth',.2,.4),100);setTimeout(()=>beep(100,'sawtooth',.3,.4),250);}
+function sndStart(){beep(330,'square',.08);setTimeout(()=>beep(440,'square',.08),100);setTimeout(()=>beep(660,'square',.15),200);}
+function unlockAudio(){AC.resume();}
+
+const COLS=20,ROWS=20;
+const DIRS={UP:{x:0,y:-1},DOWN:{x:0,y:1},LEFT:{x:-1,y:0},RIGHT:{x:1,y:0}};
+
+let snake,dir,nextDir,food,score,best,loop,speed,alive;
+best=parseInt(localStorage.getItem('snakeBest')||'0');
+
+const screens={home:$('home'),game:$('game'),gameover:$('gameover')};
+const canvas=$('gc'),ctx=canvas.getContext('2d');
+const scoreVal=$('score-val'),hudBest=$('hud-best');
+const homeBest=$('home-best'),goBest=$('go-best'),goScore=$('go-score');
+
+function $(id){return document.getElementById(id);}
+function show(name){Object.values(screens).forEach(s=>s.classList.remove('active'));screens[name].classList.add('active');}
+
+function resize(){
+  const wrap=$('canvas-wrap');
+  const avW=wrap.clientWidth-16,avH=wrap.clientHeight-8;
+  const cell=Math.floor(Math.min(avW/COLS,avH/ROWS));
+  canvas.width=cell*COLS;canvas.height=cell*ROWS;
+  return cell;
+}
+let CELL=16;
+window.addEventListener('resize',()=>{if(alive!==undefined){CELL=resize();draw();}});
+
+function initGame(){
+  CELL=resize();
+  snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+  dir={...DIRS.RIGHT};nextDir={...DIRS.RIGHT};
+  score=0;alive=true;speed=150;
+  spawnFood();updateHUD();
+  clearInterval(loop);
+  loop=setInterval(tick,speed);
+}
+
+function spawnFood(){
+  let pos;
+  do{pos={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};}
+  while(snake.some(s=>s.x===pos.x&&s.y===pos.y));
+  food=pos;
+}
+
+function tick(){
+  if(!alive||!dir||!nextDir||!snake||!snake.length)return;
+  dir={...nextDir};
+  const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+  if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS)return die();
+  if(snake.some(s=>s.x===head.x&&s.y===head.y))return die();
+  snake.unshift(head);
+  if(head.x===food.x&&head.y===food.y){
+    score++;sndEat();
+    if(score>best){best=score;localStorage.setItem('snakeBest',best);}
+    updateHUD();spawnFood();
+    if(score%5===0&&speed>60){clearInterval(loop);speed=Math.max(60,speed-10);loop=setInterval(tick,speed);}
+  }else{snake.pop();}
+  draw();
+}
+
+function die(){
+  alive=false;clearInterval(loop);sndDie();
+  setTimeout(()=>{goScore.textContent=score;goBest.textContent=best;show('gameover');},600);
+}
+
+function updateHUD(){
+  scoreVal.textContent=score;hudBest.textContent=best;homeBest.textContent=best;
+}
+
+function draw(){
+  if(!food||!snake||!dir)return;
+  const C=CELL,W=canvas.width,H=canvas.height;
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#003d10';ctx.lineWidth=.5;
+  for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*C,0);ctx.lineTo(x*C,H);ctx.stroke();}
+  for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*C);ctx.lineTo(W,y*C);ctx.stroke();}
+  ctx.fillStyle='#ff0040';ctx.shadowColor='#ff0040';ctx.shadowBlur=10;
+  const fx=food.x*C+C/2,fy=food.y*C+C/2,fr=C*.35;
+  ctx.beginPath();ctx.arc(fx,fy,fr,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#ff6680';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(fx-fr*.5,fy);ctx.lineTo(fx+fr*.5,fy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(fx,fy-fr*.5);ctx.lineTo(fx,fy+fr*.5);ctx.stroke();
+  ctx.shadowBlur=0;
+  snake.forEach((seg,i)=>{
+    const isHead=i===0;
+    const alpha=isHead?1:Math.max(.4,1-i/snake.length*.6);
+    ctx.fillStyle=isHead?'#00ff41':`rgba(0,${Math.floor(180+75*alpha)},${Math.floor(30+11*alpha)},${alpha})`;
+    ctx.shadowColor='#00ff41';ctx.shadowBlur=isHead?12:4;
+    const pad=isHead?1:2;
+    ctx.fillRect(seg.x*C+pad,seg.y*C+pad,C-pad*2,C-pad*2);
+    if(isHead){
+      ctx.fillStyle='#000';ctx.shadowBlur=0;
+      const ex=dir.x,ey=dir.y;
+      const cx2=seg.x*C+C/2,cy2=seg.y*C+C/2;
+      const er=Math.max(1.5,C*.1),spread=C*.18;
+      const px=-ey,py=ex;
+      ctx.beginPath();ctx.arc(cx2+ex*C*.2+px*spread,cy2+ey*C*.2+py*spread,er,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cx2+ex*C*.2-px*spread,cy2+ey*C*.2-py*spread,er,0,Math.PI*2);ctx.fill();
+    }
+    ctx.shadowBlur=0;
+  });
+}
+
+document.addEventListener('keydown',e=>{
+  unlockAudio();
+  const map={ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',w:'UP',s:'DOWN',a:'LEFT',d:'RIGHT',W:'UP',S:'DOWN',A:'LEFT',D:'RIGHT'};
+  const d=map[e.key];if(!d)return;e.preventDefault();setDir(d);
+});
+
+function setDir(d){
+  const opp={UP:'DOWN',DOWN:'UP',LEFT:'RIGHT',RIGHT:'LEFT'};
+  const cur=Object.keys(DIRS).find(k=>DIRS[k].x===dir.x&&DIRS[k].y===dir.y);
+  if(opp[d]!==cur)nextDir={...DIRS[d]};
+}
+
+[['dp-up','UP'],['dp-down','DOWN'],['dp-left','LEFT'],['dp-right','RIGHT']].forEach(([id,d])=>{
+  const el=$(id);
+  const press=e=>{e.preventDefault();unlockAudio();setDir(d);el.classList.add('pressed');};
+  const rel=()=>el.classList.remove('pressed');
+  el.addEventListener('touchstart',press,{passive:false});
+  el.addEventListener('touchend',rel);
+  el.addEventListener('mousedown',press);
+  el.addEventListener('mouseup',rel);
+});
+
+let tx=0,ty=0;
+document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;
+  unlockAudio();
+  if(Math.abs(dx)>Math.abs(dy))setDir(dx>0?'RIGHT':'LEFT');
+  else setDir(dy>0?'DOWN':'UP');
+},{passive:true});
+
+$('play-btn').addEventListener('click',()=>{unlockAudio();sndStart();show('game');homeBest.textContent=best;initGame();});
+$('retry-btn').addEventListener('click',()=>{unlockAudio();sndStart();show('game');initGame();});
+$('home-btn').addEventListener('click',()=>{clearInterval(loop);alive=false;homeBest.textContent=best;show('home');});
+
+const manifest={name:'Retro Snake',short_name:'SNAKE',start_url:'.',display:'standalone',background_color:'#000000',theme_color:'#000000',icons:[{src:'icon.png',sizes:'192x192',type:'image/png'},{src:'icon.png',sizes:'512x512',type:'image/png'}]};
+const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=URL.createObjectURL(mBlob);document.head.appendChild(mLink);
+if('serviceWorker' in navigator){const swCode=`self.addEventListener('install',e=>e.waitUntil(caches.open('snake-v1').then(c=>c.addAll(['/']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:'application/javascript'}))).catch(()=>{});}
+
+homeBest.textContent=best;
+</script>
+</body>
+</html>
